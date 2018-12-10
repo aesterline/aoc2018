@@ -4,9 +4,15 @@ pub fn frequency<T>(changes: T) -> Result<i64>
 where
     T: BufRead,
 {
-    changes.lines().fold(Ok(0), |result, change| {
-        Ok(result? + change?.parse::<i64>().unwrap())
-    })
+    // changes.lines().fold(Ok(0), |result, change| {
+    //     Ok(result? + change?.parse::<i64>().unwrap())
+    // })
+
+    let mut result = 0;
+    for line in changes.lines() {
+        result += line?.parse::<i64>().unwrap()
+    }
+    Ok(result)
 }
 
 #[cfg(test)]
