@@ -16,25 +16,44 @@ where
     Ok(result)
 }
 
-pub fn first_repeated_frequency<T>(mut changes: T) -> Result<i64>
+struct BufReadCycle<B> {
+    buf: B,
+}
+
+impl<B: BufRead + Seek> Iterator for BufReadCycle<B> {
+    type Item = String;
+
+    fn next(&mut self) -> Option<String> {
+        let mut line = String::new();
+        match self.buf.read_line(&mut line) {
+            Ok(0) => {
+                if self.buf.seek(SeekFrom::Start(0)).is_err() {
+                    return None;
+                }
+                self.next()
+            }
+            Ok(_) => Some(line.trim_end().to_string()),
+            Err(_) => None,
+        }
+    }
+}
+
+pub fn first_repeated_frequency<T>(changes: T) -> Result<i64>
 where
     T: BufRead + Seek,
 {
     let mut seen_frequences: HashSet<i64> = HashSet::new();
     let mut current_frequency = 0;
-    let mut line = String::new();
+    let lines = BufReadCycle { buf: changes };
 
-    while !seen_frequences.contains(&current_frequency) {
-        seen_frequences.insert(current_frequency);
-        line.clear();
-        if changes.read_line(&mut line)? == 0 {
-            changes.seek(SeekFrom::Start(0))?;
-            changes.read_line(&mut line)?;
+    for line in lines {
+        if seen_frequences.contains(&current_frequency) {
+            return Ok(current_frequency);
         }
-        current_frequency += line.trim_end().parse::<i64>().unwrap();
+        seen_frequences.insert(current_frequency);
+        current_frequency += line.parse::<i64>().unwrap();
     }
-
-    Ok(current_frequency)
+    Ok(0)
 }
 
 #[cfg(test)]
@@ -97,5 +116,16 @@ mod tests {
         let input_file = File::open("test_data/day_1_input.txt").unwrap();
         let file = BufReader::new(&input_file);
         assert_eq!(488, first_repeated_frequency(file).unwrap())
+    }
+
+    #[test]
+    fn input_is_cycled() {
+        let buf = Cursor::new(b"foo\nbar");
+        let mut iter = BufReadCycle { buf };
+
+        assert_eq!(Some(String::from("foo")), iter.next());
+        assert_eq!(Some(String::from("bar")), iter.next());
+        assert_eq!(Some(String::from("foo")), iter.next());
+        assert_eq!(Some(String::from("bar")), iter.next());
     }
 }
